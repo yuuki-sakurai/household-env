@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>家計簿アプリ 環境構築チェックリスト</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f7fb; --panel:#fff; --text:#1f2937; --muted:#6b7280; --border:#dfe3eb; --accent:#2563eb; --accent-soft:#dbeafe; --success:#15803d; --success-soft:#dcfce7; --warning-soft:#fef3c7; --danger:#b91c1c; --shadow:0 10px 30px rgba(31,41,55,.08); }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; line-height:1.7; }
+    button,input,textarea { font:inherit; }
+    .container { width:min(1100px,calc(100% - 32px)); margin:32px auto 64px; }
+    .hero { background:linear-gradient(135deg,#1d4ed8,#2563eb 55%,#3b82f6); color:#fff; border-radius:24px; padding:32px; box-shadow:var(--shadow); }
+    .hero h1 { margin:0 0 8px; font-size:clamp(1.8rem,3vw,2.7rem); line-height:1.25; }
+    .hero p { margin:0; opacity:.9; }
+    .summary-grid { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:16px; margin-top:22px; }
+    .summary-card { padding:18px; border-radius:16px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.2); backdrop-filter:blur(8px); }
+    .summary-label { font-size:.82rem; opacity:.82; }
+    .summary-value { margin-top:4px; font-size:1.5rem; font-weight:800; }
+    .progress-track { height:14px; margin-top:10px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.28); }
+    .progress-bar { width:0; height:100%; border-radius:inherit; background:#fff; transition:width .25s ease; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:22px 0; }
+    .toolbar-left,.toolbar-right { display:flex; flex-wrap:wrap; gap:10px; }
+    .button { appearance:none; border:1px solid var(--border); border-radius:12px; padding:10px 14px; background:var(--panel); color:var(--text); cursor:pointer; font-weight:700; box-shadow:0 3px 10px rgba(31,41,55,.04); }
+    .button:hover { border-color:#9ca3af; }
+    .button.danger { color:var(--danger); }
+    .notice { margin:0 0 22px; padding:14px 16px; border:1px solid #bfdbfe; border-radius:14px; background:#eff6ff; color:#1e3a8a; }
+    .phase { margin-top:20px; overflow:hidden; border:1px solid var(--border); border-radius:20px; background:var(--panel); box-shadow:var(--shadow); }
+    .phase-header { display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:20px 22px; background:#fbfcfe; border-bottom:1px solid var(--border); cursor:pointer; }
+    .phase-number { display:grid; width:46px; height:46px; place-items:center; border-radius:14px; background:var(--accent-soft); color:var(--accent); font-size:1.15rem; font-weight:900; }
+    .phase-title { margin:0; font-size:1.18rem; }
+    .phase-goal { margin:3px 0 0; color:var(--muted); font-size:.92rem; }
+    .phase-status { padding:6px 10px; border-radius:999px; background:#f3f4f6; color:var(--muted); font-size:.82rem; font-weight:800; white-space:nowrap; }
+    .phase.completed .phase-status { background:var(--success-soft); color:var(--success); }
+    .phase-body { padding:22px; }
+    .task-list { display:grid; gap:10px; padding:0; margin:0; list-style:none; }
+    .task-item { display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:flex-start; padding:12px 14px; border:1px solid transparent; border-radius:12px; background:#fafafa; }
+    .task-item:hover { border-color:var(--border); }
+    .task-item input[type="checkbox"] { width:20px; height:20px; margin-top:3px; accent-color:var(--accent); cursor:pointer; }
+    .task-label { cursor:pointer; }
+    .task-label strong { display:block; }
+    .task-label small { display:block; margin-top:2px; color:var(--muted); }
+    .task-item.done { background:#f0fdf4; }
+    .task-item.done .task-label { color:#64748b; text-decoration:line-through; }
+    .code { display:block; margin-top:7px; padding:8px 10px; overflow-x:auto; border-radius:9px; background:#111827; color:#e5e7eb; font-family:Consolas,Monaco,"Courier New",monospace; font-size:.84rem; white-space:pre-wrap; text-decoration:none; }
+    .completion { margin-top:18px; padding:14px 16px; border-radius:14px; background:var(--warning-soft); color:#713f12; }
+    .completion strong { display:block; margin-bottom:4px; }
+    .phase.completed .completion { background:var(--success-soft); color:#14532d; }
+    .memo-section { margin-top:24px; padding:22px; border:1px solid var(--border); border-radius:20px; background:var(--panel); box-shadow:var(--shadow); }
+    .memo-section h2 { margin-top:0; }
+    textarea { width:100%; min-height:180px; resize:vertical; border:1px solid var(--border); border-radius:14px; padding:14px; background:#fcfcfd; color:var(--text); outline:none; }
+    textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+    .storage-note { margin-top:8px; color:var(--muted); font-size:.85rem; }
+    .footer { margin-top:24px; color:var(--muted); text-align:center; font-size:.88rem; }
+    @media (max-width:760px) { .container{width:min(100% - 20px,1100px);margin-top:10px}.hero{padding:22px;border-radius:18px}.summary-grid{grid-template-columns:1fr}.phase-header{grid-template-columns:auto 1fr}.phase-status{grid-column:1 / -1;justify-self:start}.phase-body,.memo-section{padding:16px} }
+    @media print { body{background:#fff}.container{width:100%;margin:0}.hero,.phase,.memo-section{box-shadow:none}.toolbar{display:none} }
+  details.file-block{margin-top:12px;border:1px solid var(--border);border-radius:12px;background:#fff;overflow:hidden}details.file-block summary{cursor:pointer;padding:10px 12px;font-weight:800;background:#f8fafc}details.file-block pre{margin:0;padding:14px;overflow-x:auto;background:#0f172a;color:#e2e8f0;font-family:Consolas,Monaco,"Courier New",monospace;font-size:.82rem;line-height:1.55;white-space:pre}</style>
+</head>
+<body>
+  <main class="container">
+    <section class="hero">
+      <h1>家計簿アプリ 環境構築チェックリスト</h1>
+      <p>環境用リポジトリ + 家計簿アプリリポジトリで進める、全5回の作業記録です。</p>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-label">全体進捗</div><div id="progressText" class="summary-value">0%</div><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div></div>
+        <div class="summary-card"><div class="summary-label">完了タスク</div><div id="completedCount" class="summary-value">0 / 0</div></div>
+        <div class="summary-card"><div class="summary-label">完了フェーズ</div><div id="completedPhases" class="summary-value">0 / 5</div></div>
+      </div>
+    </section>
+    <div class="toolbar"><div class="toolbar-left"><button id="expandAll" class="button" type="button">すべて展開</button><button id="collapseCompleted" class="button" type="button">完了済みを折りたたむ</button></div><div class="toolbar-right"><button class="button" type="button" onclick="window.print()">印刷</button><button id="resetAll" class="button danger" type="button">チェックをリセット</button></div></div>
+    <p class="notice">チェック状態とメモは、このHTMLを開いているブラウザのローカルストレージに自動保存されます。</p>
+
+    <section class="phase" data-phase="1"><header class="phase-header"><div class="phase-number">1</div><div><h2 class="phase-title">リポジトリとディレクトリを作る</h2><p class="phase-goal">環境用と家計簿アプリ用を別Gitリポジトリとして配置する。</p></div><div class="phase-status">未完了</div></header><div class="phase-body"><ul class="task-list">
+      <li class="task-item"><input id="task-1-1" type="checkbox"><label class="task-label" for="task-1-1"><strong>GitHubに環境用リポジトリを作成する</strong><small>例: household-env</small></label></li>
+      <li class="task-item"><input id="task-1-2" type="checkbox"><label class="task-label" for="task-1-2"><strong>GitHubに家計簿アプリ用リポジトリを作成する</strong><small>例: kakeibo-app</small></label></li>
+      <li class="task-item"><input id="task-1-3" type="checkbox"><label class="task-label" for="task-1-3"><strong>環境用リポジトリをローカルへcloneする</strong><span class="code">git clone &lt;household-envのURL&gt;
+cd household-env</span></label></li>
+      <li class="task-item"><input id="task-1-4" type="checkbox"><label class="task-label" for="task-1-4"><strong>srcディレクトリを作成する</strong><span class="code">mkdir src</span></label></li>
+      <li class="task-item"><input id="task-1-5" type="checkbox"><label class="task-label" for="task-1-5"><strong>家計簿アプリをsrc/kakeiboへcloneする</strong><span class="code">git clone &lt;kakeibo-appのURL&gt; src/kakeibo</span></label></li>
+      <li class="task-item"><input id="task-1-6" type="checkbox"><label class="task-label" for="task-1-6"><strong>環境リポジトリの.gitignoreへsrc配下を追加する</strong><span class="code">/src/*
+!/src/.gitkeep</span></label></li>
+      <li class="task-item"><input id="task-1-7" type="checkbox"><label class="task-label" for="task-1-7"><strong>環境リポジトリからsrc/kakeiboの変更が追跡されないことを確認する</strong><span class="code">git status</span></label></li>
+    </ul><div class="completion"><strong>第1回の完了条件</strong>household-envの中に、別Gitリポジトリとしてsrc/kakeiboが存在している。</div></div></section>
+
+    <section class="phase" data-phase="2"><header class="phase-header"><div class="phase-number">2</div><div><h2 class="phase-title">Docker Compose環境を作る</h2><p class="phase-goal">Nginx、PHP-FPM、MySQLの3コンテナを起動する。</p></div><div class="phase-status">未完了</div></header><div class="phase-body"><ul class="task-list">
+      <li class="task-item"><input id="task-2-1" type="checkbox"><label class="task-label" for="task-2-1"><strong>docker/app、docker/nginx、docker/mysql/initを作成する</strong><span class="code">mkdir docker\app
+mkdir docker\nginx
+mkdir docker\mysql
+mkdir docker\mysql\init</span></label></li>
+      <li class="task-item"><input id="task-2-2" type="checkbox"><label class="task-label" for="task-2-2"><strong>docker/app/Dockerfileを作成する</strong><small>PHP-FPM、Composer、Node.js、必要なPHP拡張を含める。</small></label></li>
+      <li class="task-item"><input id="task-2-3" type="checkbox"><label class="task-label" for="task-2-3"><strong>docker/app/php.iniを作成する</strong><small>タイムゾーン、メモリ、アップロード上限などを設定する。</small></label></li>
+      <li class="task-item"><input id="task-2-4" type="checkbox"><label class="task-label" for="task-2-4"><strong>docker/nginx/kakeibo.confを作成する</strong><small>ドキュメントルートを/var/www/html/publicに設定する。</small></label></li>
+      <li class="task-item"><input id="task-2-5" type="checkbox"><label class="task-label" for="task-2-5"><strong>docker/mysql/init/01-create-databases.sqlを作成する</strong><small>kakeiboデータベースとアプリユーザーを作成する。</small></label></li>
+      <li class="task-item"><input id="task-2-6" type="checkbox"><label class="task-label" for="task-2-6"><strong>環境用.envと.env.exampleを作成する</strong><small>DB_ROOT_PASSWORD、DB_USERNAME、DB_PASSWORDなどを定義する。</small></label></li>
+      <li class="task-item"><input id="task-2-7" type="checkbox"><label class="task-label" for="task-2-7"><strong>compose.yamlを作成する</strong><small>kakeibo-app、kakeibo-web、dbを定義する。</small></label></li>
+      <li class="task-item"><input id="task-2-8" type="checkbox"><label class="task-label" for="task-2-8"><strong>Compose設定を検証する</strong><span class="code">docker compose config</span></label></li>
+      <li class="task-item"><input id="task-2-9" type="checkbox"><label class="task-label" for="task-2-9"><strong>コンテナをビルド・起動する</strong><span class="code">docker compose build
+docker compose up -d
+docker compose ps</span></label></li>
+      <li class="task-item"><input id="task-2-10" type="checkbox"><label class="task-label" for="task-2-10"><strong>dbがhealthyになっていることを確認する</strong><small>この時点でWeb画面がエラーでも問題なし。</small></label></li>
+    </ul><details class="file-block"><summary>docker/app/Dockerfile の内容</summary><pre>FROM node:22-bookworm-slim AS node
+FROM composer:2 AS composer
+FROM php:8.4-fpm-bookworm
+
+ENV TZ=Asia/Tokyo
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN apt-get update \
+    &amp;&amp; apt-get install -y --no-install-recommends \
+        git unzip curl libicu-dev libzip-dev libonig-dev libxml2-dev default-mysql-client \
+    &amp;&amp; docker-php-ext-install bcmath intl mbstring pdo_mysql zip opcache \
+    &amp;&amp; apt-get clean \
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    &amp;&amp; ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+COPY docker/app/php.ini /usr/local/etc/php/conf.d/99-household.ini
+WORKDIR /var/www/html
+CMD [&quot;php-fpm&quot;]</pre></details><details class="file-block"><summary>docker/app/php.ini の内容</summary><pre>[PHP]
+date.timezone = Asia/Tokyo
+memory_limit = 512M
+upload_max_filesize = 20M
+post_max_size = 20M
+max_execution_time = 120
+display_errors = On
+display_startup_errors = On
+error_reporting = E_ALL
+
+[opcache]
+opcache.enable = 1
+opcache.enable_cli = 1
+opcache.validate_timestamps = 1
+opcache.revalidate_freq = 0</pre></details><details class="file-block"><summary>docker/nginx/kakeibo.conf の内容</summary><pre>server {
+    listen 80;
+    server_name localhost;
+    root /var/www/html/public;
+    index index.php index.html;
+    charset utf-8;
+    client_max_body_size 20M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass kakeibo-app:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+
+    location ~ /\.(?!well-known).* { deny all; }
+}</pre></details><details class="file-block"><summary>docker/mysql/init/01-create-databases.sql の内容</summary><pre>CREATE DATABASE IF NOT EXISTS kakeibo
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS &#x27;app_user&#x27;@&#x27;%&#x27; IDENTIFIED BY &#x27;app_password&#x27;;
+GRANT ALL PRIVILEGES ON kakeibo.* TO &#x27;app_user&#x27;@&#x27;%&#x27;;
+FLUSH PRIVILEGES;</pre></details><details class="file-block"><summary>.env の内容</summary><pre>COMPOSE_PROJECT_NAME=household
+DB_ROOT_PASSWORD=root_password
+DB_USERNAME=app_user
+DB_PASSWORD=app_password</pre></details><details class="file-block"><summary>compose.yaml の内容</summary><pre>services:
+  kakeibo-app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    working_dir: /var/www/html
+    volumes:
+      - ./src/kakeibo:/var/www/html
+      - kakeibo-vendor:/var/www/html/vendor
+      - kakeibo-node-modules:/var/www/html/node_modules
+    ports:
+      - &quot;5173:5173&quot;
+    environment:
+      TZ: Asia/Tokyo
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - household-network
+
+  kakeibo-web:
+    image: nginx:stable-alpine
+    ports:
+      - &quot;8080:80&quot;
+    volumes:
+      - ./src/kakeibo:/var/www/html:ro
+      - ./docker/nginx/kakeibo.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - kakeibo-app
+    networks:
+      - household-network
+
+  db:
+    image: mysql:8.4
+    ports:
+      - &quot;3306:3306&quot;
+    environment:
+      TZ: Asia/Tokyo
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [&quot;CMD&quot;, &quot;mysqladmin&quot;, &quot;ping&quot;, &quot;-h&quot;, &quot;localhost&quot;, &quot;-u&quot;, &quot;root&quot;, &quot;-p${DB_ROOT_PASSWORD}&quot;]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - household-network
+
+networks:
+  household-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  kakeibo-vendor:
+  kakeibo-node-modules:</pre></details><div class="completion"><strong>第2回の完了条件</strong>kakeibo-app、kakeibo-web、dbが起動し、dbがhealthyになっている。</div></div></section>
+
+    <section class="phase" data-phase="3"><header class="phase-header"><div class="phase-number">3</div><div><h2 class="phase-title">Laravelを作成してDBへ接続する</h2><p class="phase-goal">Laravel初期画面とMySQL接続を確認する。</p></div><div class="phase-status">未完了</div></header><div class="phase-body"><ul class="task-list">
+      <li class="task-item"><input id="task-3-1" type="checkbox"><label class="task-label" for="task-3-1"><strong>src/kakeiboがLaravel作成可能な状態か確認する</strong><small>READMEなどがある場合はcreate-project前に退避する。</small></label></li>
+      <li class="task-item"><input id="task-3-2" type="checkbox"><label class="task-label" for="task-3-2"><strong>Laravelプロジェクトを作成する</strong><span class="code">docker compose run --rm kakeibo-app composer create-project laravel/laravel .</span></label></li>
+      <li class="task-item"><input id="task-3-3" type="checkbox"><label class="task-label" for="task-3-3"><strong>Laravel側の.envを設定する</strong><small>DB_HOST=db、DB_DATABASE=kakeiboを設定する。</small></label></li>
+      <li class="task-item"><input id="task-3-4" type="checkbox"><label class="task-label" for="task-3-4"><strong>APP_KEYを生成する</strong><span class="code">docker compose exec kakeibo-app php artisan key:generate</span></label></li>
+      <li class="task-item"><input id="task-3-5" type="checkbox"><label class="task-label" for="task-3-5"><strong>マイグレーションを実行する</strong><span class="code">docker compose exec kakeibo-app php artisan migrate</span></label></li>
+      <li class="task-item"><input id="task-3-6" type="checkbox"><label class="task-label" for="task-3-6"><strong>DB接続情報を確認する</strong><span class="code">docker compose exec kakeibo-app php artisan db:show</span></label></li>
+      <li class="task-item"><input id="task-3-7" type="checkbox"><label class="task-label" for="task-3-7"><strong>Nginx設定を再読込する</strong><span class="code">docker compose restart kakeibo-web</span></label></li>
+      <li class="task-item"><input id="task-3-8" type="checkbox"><label class="task-label" for="task-3-8"><strong>Laravel初期画面を確認する</strong><span class="code">http://localhost:8080</span></label></li>
+      <li class="task-item"><input id="task-3-9" type="checkbox"><label class="task-label" for="task-3-9"><strong>マイグレーション状態を確認する</strong><span class="code">docker compose exec kakeibo-app php artisan migrate:status</span></label></li>
+    </ul><div class="completion"><strong>第3回の完了条件</strong>Laravel初期画面が表示され、MySQLへの接続とマイグレーションが成功している。</div></div></section>
+
+    <section class="phase" data-phase="4"><header class="phase-header"><div class="phase-number">4</div><div><h2 class="phase-title">Vue 3とTypeScriptを導入する</h2><p class="phase-goal">LaravelのBladeからVueを表示し、Vite HMRを動かす。</p></div><div class="phase-status">未完了</div></header><div class="phase-body"><ul class="task-list">
+      <li class="task-item"><input id="task-4-1" type="checkbox"><label class="task-label" for="task-4-1"><strong>npm依存関係をインストールする</strong><span class="code">docker compose exec kakeibo-app npm install</span></label></li>
+      <li class="task-item"><input id="task-4-2" type="checkbox"><label class="task-label" for="task-4-2"><strong>Vue 3をインストールする</strong><span class="code">docker compose exec kakeibo-app npm install vue</span></label></li>
+      <li class="task-item"><input id="task-4-3" type="checkbox"><label class="task-label" for="task-4-3"><strong>TypeScriptとVue用Viteプラグインを導入する</strong><span class="code">docker compose exec kakeibo-app npm install -D typescript vue-tsc @vitejs/plugin-vue</span></label></li>
+      <li class="task-item"><input id="task-4-4" type="checkbox"><label class="task-label" for="task-4-4"><strong>vite.config.tsを作成・設定する</strong><small>app.tsとapp.cssをエントリにし、hostを0.0.0.0へ設定する。</small></label></li>
+      <li class="task-item"><input id="task-4-5" type="checkbox"><label class="task-label" for="task-4-5"><strong>resources/js/app.tsを作成する</strong><small>createApp(App).mount('#app')を記述する。</small></label></li>
+      <li class="task-item"><input id="task-4-6" type="checkbox"><label class="task-label" for="task-4-6"><strong>resources/js/App.vueを作成する</strong><small>初期確認用の簡単な画面を表示する。</small></label></li>
+      <li class="task-item"><input id="task-4-7" type="checkbox"><label class="task-label" for="task-4-7"><strong>resources/views/app.blade.phpを作成する</strong><small>@viteとdiv#appを記述する。</small></label></li>
+      <li class="task-item"><input id="task-4-8" type="checkbox"><label class="task-label" for="task-4-8"><strong>routes/web.phpからapp.blade.phpを返す</strong><small>最初はルート「/」だけでよい。</small></label></li>
+      <li class="task-item"><input id="task-4-9" type="checkbox"><label class="task-label" for="task-4-9"><strong>compose.yamlでViteの5173番ポートを公開する</strong><span class="code">ports:
+  - "5173:5173"</span></label></li>
+      <li class="task-item"><input id="task-4-10" type="checkbox"><label class="task-label" for="task-4-10"><strong>Vite開発サーバーを起動する</strong><span class="code">docker compose exec kakeibo-app npm run dev -- --host 0.0.0.0</span></label></li>
+      <li class="task-item"><input id="task-4-11" type="checkbox"><label class="task-label" for="task-4-11"><strong>Vue画面とHMRを確認する</strong><small>App.vueを編集し、自動反映されることを確認する。</small></label></li>
+    </ul><div class="completion"><strong>第4回の完了条件</strong>http://localhost:8080でVue画面が表示され、App.vueの変更が自動反映される。</div></div></section>
+
+    <section class="phase" data-phase="5"><header class="phase-header"><div class="phase-number">5</div><div><h2 class="phase-title">開発用ツールと運用手順を整える</h2><p class="phase-goal">テスト、型チェック、Lint、ビルドを安定して実行できる状態にする。</p></div><div class="phase-status">未完了</div></header><div class="phase-body"><ul class="task-list">
+      <li class="task-item"><input id="task-5-1" type="checkbox"><label class="task-label" for="task-5-1"><strong>Biomeをインストールする</strong><span class="code">docker compose exec kakeibo-app npm install -D @biomejs/biome</span></label></li>
+      <li class="task-item"><input id="task-5-2" type="checkbox"><label class="task-label" for="task-5-2"><strong>package.jsonへtypecheck、lint、lint:fixを追加する</strong><small>vue-tscとBiomeをnpm scriptsから実行できるようにする。</small></label></li>
+      <li class="task-item"><input id="task-5-3" type="checkbox"><label class="task-label" for="task-5-3"><strong>PHPUnitを実行する</strong><span class="code">docker compose exec kakeibo-app php artisan test</span></label></li>
+      <li class="task-item"><input id="task-5-4" type="checkbox"><label class="task-label" for="task-5-4"><strong>Laravel Pintを実行する</strong><span class="code">docker compose exec kakeibo-app ./vendor/bin/pint --test</span></label></li>
+      <li class="task-item"><input id="task-5-5" type="checkbox"><label class="task-label" for="task-5-5"><strong>TypeScript型チェックを実行する</strong><span class="code">docker compose exec kakeibo-app npm run typecheck</span></label></li>
+      <li class="task-item"><input id="task-5-6" type="checkbox"><label class="task-label" for="task-5-6"><strong>Biomeのチェックを実行する</strong><span class="code">docker compose exec kakeibo-app npm run lint</span></label></li>
+      <li class="task-item"><input id="task-5-7" type="checkbox"><label class="task-label" for="task-5-7"><strong>フロントエンドの本番ビルドを確認する</strong><span class="code">docker compose exec kakeibo-app npm run build</span></label></li>
+      <li class="task-item"><input id="task-5-8" type="checkbox"><label class="task-label" for="task-5-8"><strong>環境リポジトリのREADMEを作成する</strong><small>初回セットアップ、起動、停止、ログ、DB初期化を記載する。</small></label></li>
+      <li class="task-item"><input id="task-5-9" type="checkbox"><label class="task-label" for="task-5-9"><strong>家計簿アプリのREADMEを作成する</strong><small>アプリ概要、マイグレーション、テスト、フロントビルドを記載する。</small></label></li>
+      <li class="task-item"><input id="task-5-10" type="checkbox"><label class="task-label" for="task-5-10"><strong>環境用・家計簿アプリ用の変更をそれぞれcommitする</strong><small>別リポジトリなので、それぞれのディレクトリでcommitする。</small></label></li>
+    </ul><div class="completion"><strong>第5回の完了条件</strong>Docker起動、Laravel、MySQL、Vue、HMR、PHPUnit、型チェック、Lint、本番ビルドがすべて通る。</div></div></section>
+
+    <section class="memo-section"><h2>作業メモ</h2><textarea id="memo" placeholder="詰まった点、変更した設定、次にやることなどを書いてください。"></textarea><div class="storage-note">メモは入力のたびに自動保存されます。</div></section>
+    <p class="footer">全5回完了後は、ユーザー認証 → カテゴリ → 支出登録 → 支出一覧 → 月別集計へ進みます。</p>
+  </main>
+  <script>
+    (() => {
+      const STORAGE_KEY = "kakeibo-environment-checklist-v1";
+      const MEMO_KEY = "kakeibo-environment-checklist-memo-v1";
+      const checkboxes = [...document.querySelectorAll('input[type="checkbox"]')];
+      const phases = [...document.querySelectorAll('.phase')];
+      const memo = document.getElementById('memo');
+      const progressText = document.getElementById('progressText');
+      const progressBar = document.getElementById('progressBar');
+      const completedCount = document.getElementById('completedCount');
+      const completedPhases = document.getElementById('completedPhases');
+      const loadState = () => {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        checkboxes.forEach((checkbox) => { checkbox.checked = Boolean(saved[checkbox.id]); updateTaskStyle(checkbox); });
+        memo.value = localStorage.getItem(MEMO_KEY) || '';
+        updateProgress();
+      };
+      const saveState = () => {
+        const state = {};
+        checkboxes.forEach((checkbox) => { state[checkbox.id] = checkbox.checked; });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      };
+      function updateTaskStyle(checkbox) { checkbox.closest('.task-item').classList.toggle('done', checkbox.checked); }
+      function updateProgress() {
+        const done = checkboxes.filter((checkbox) => checkbox.checked).length;
+        const total = checkboxes.length;
+        const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+        progressText.textContent = `${percent}%`;
+        progressBar.style.width = `${percent}%`;
+        completedCount.textContent = `${done} / ${total}`;
+        let phaseDoneCount = 0;
+        phases.forEach((phase) => {
+          const phaseChecks = [...phase.querySelectorAll('input[type="checkbox"]')];
+          const phaseComplete = phaseChecks.length > 0 && phaseChecks.every((checkbox) => checkbox.checked);
+          phase.classList.toggle('completed', phaseComplete);
+          phase.querySelector('.phase-status').textContent = phaseComplete ? '完了' : '未完了';
+          if (phaseComplete) phaseDoneCount += 1;
+        });
+        completedPhases.textContent = `${phaseDoneCount} / ${phases.length}`;
+      }
+      checkboxes.forEach((checkbox) => checkbox.addEventListener('change', () => { updateTaskStyle(checkbox); saveState(); updateProgress(); }));
+      memo.addEventListener('input', () => localStorage.setItem(MEMO_KEY, memo.value));
+      document.getElementById('resetAll').addEventListener('click', () => {
+        if (!window.confirm('すべてのチェック状態をリセットします。作業メモは残します。')) return;
+        checkboxes.forEach((checkbox) => { checkbox.checked = false; updateTaskStyle(checkbox); });
+        saveState(); updateProgress();
+      });
+      document.getElementById('collapseCompleted').addEventListener('click', () => phases.forEach((phase) => { if (phase.classList.contains('completed')) phase.querySelector('.phase-body').hidden = true; }));
+      document.getElementById('expandAll').addEventListener('click', () => phases.forEach((phase) => phase.querySelector('.phase-body').hidden = false));
+      phases.forEach((phase) => phase.querySelector('.phase-header').addEventListener('click', () => { const body = phase.querySelector('.phase-body'); body.hidden = !body.hidden; }));
+      loadState();
+    })();
+  </script>
+</body>
+</html>

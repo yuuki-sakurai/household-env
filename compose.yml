@@ -1,0 +1,65 @@
+services:
+  kakeibo-app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    working_dir: /var/www/html
+    volumes:
+      - ./src/kakeibo:/var/www/html
+      - kakeibo-vendor:/var/www/html/vendor
+      - kakeibo-node-modules:/var/www/html/node_modules
+    environment:
+      TZ: Asia/Tokyo
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - household-network
+
+  kakeibo-web:
+    image: nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src/kakeibo:/var/www/html:ro
+      - ./docker/nginx/kakeibo.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - kakeibo-app
+    networks:
+      - household-network
+
+  db:
+    image: mysql:8.4
+    ports:
+      - "3306:3306"
+    environment:
+      TZ: Asia/Tokyo
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_ROOT_PASSWORD}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - household-network
+
+networks:
+  household-network:
+
+volumes:
+  mysql-data:
+  kakeibo-vendor:
+  kakeibo-node-modules:
