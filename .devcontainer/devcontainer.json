@@ -1,0 +1,19 @@
+{
+    "name": "Kakeibo Development",
+
+    "dockerComposeFile": "../compose.yml",
+
+    "service": "kakeibo-app",
+
+    "workspaceFolder": "/var/www/html",
+
+    "shutdownAction": "none",
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "Vue.volar"
+            ]
+        }
+    }
+}
