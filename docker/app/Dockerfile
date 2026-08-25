@@ -17,6 +17,7 @@ RUN set -eux; \
     # 実行時に必要なパッケージ
     apk add --no-cache \
         git \
+        openssh-client \
         unzip \
         tzdata \
         mariadb-client \
@@ -42,6 +43,8 @@ RUN set -eux; \
     \
     # コンパイル用パッケージを最終イメージから削除
     apk del --no-network .php-ext-build-deps
+
+RUN docker-php-ext-install pcntl
 
 # Composerバイナリのみコピー
 COPY --from=composer /composer /usr/local/bin/composer
