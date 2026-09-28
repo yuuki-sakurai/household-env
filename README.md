@@ -1,14 +1,16 @@
 # household-env
-家計簿アプリとクレカ管理ツールの環境用リポジトリ
 
-## 構成と開発方針
+家計簿アプリとクレカ管理ツールのローカル環境。標準の `compose.yml` は、Railwayと同じく家計簿フロントエンド・Laravel・MySQLの3サービスで起動する。フロントエンドとLaravelは、それぞれのリポジトリにある本番用 `Dockerfile` からビルドする。
 
-- `src/kakeibo`: 既存のクレカ管理アプリ（Laravel + Vue）。現在のフロントエンドとバックエンドは分離せず、家計簿向けAPIもこのLaravelに実装する。
-- `src/kanntan-kakeibo`: 家計簿フロントエンド（Vue + TypeScript）。取得元: https://github.com/yuuki-sakurai/kanntan-kakeibo
-- `db`: 共通のMySQL。Laravelから `db:3306` の `kakeibo` データベースへ接続する。家計簿フロントエンドはDBへ直接接続しない。
-- 家計簿の `/api` リクエストはViteから `kakeibo-web` へ転送する。今後のAPIはJSONを返し、業務処理は画面描画から独立させ、将来のフロント分離に備える。
-- 家計簿画面は `src/api/expenseApi.ts` のHTTPクライアントからLaravel API v1へ接続し、共通MySQLへ保存する。API・DB仕様は `src/kakeibo/docs/household-api.md` を参照。
-- 共通DBのスキーマ変更はLaravel側のマイグレーションで管理する。
+## 構成
+
+| サービス | ソース | ローカルURL・ポート | 役割 |
+| --- | --- | --- | --- |
+| `household-front` | `src/kanntan-kakeibo` | http://localhost:5174 | ビルド済みVue画面。`/api/` は内部ネットワークのLaravelへ転送 |
+| `kakeibo-app` | `src/kakeibo` | http://localhost:8080 | Laravel API・マイグレーション |
+| `db` | MySQL 8.4 | localhost:3306 | 共通DB。`mysql-data` ボリュームで保持 |
+
+本番のフロントエンドは公開HTTPSホストへAPIを転送する。ローカルではフロントエンドのイメージを変えず、nginx設定ファイルだけ `docker/nginx/household-front.local.conf.template` に差し替えてDocker内部のHTTPへ転送する。LaravelのDB接続先は `db:3306`、データベースは `kakeibo`。スキーマ変更はLaravelのマイグレーションで管理する。
 
 ## 初回セットアップ
 
@@ -19,35 +21,44 @@ git clone git@github.com:yuuki-sakurai/kakeibo-app.git src/kakeibo
 git clone https://github.com/yuuki-sakurai/kanntan-kakeibo.git src/kanntan-kakeibo
 cp -n .env.example .env
 cp -n src/kakeibo/.env.example src/kakeibo/.env
-docker compose up -d --build db kakeibo-app
-docker compose exec kakeibo-app composer install
 ```
 
-Laravelの `.env` は `DB_CONNECTION=mysql`、`DB_HOST=db`、`DB_PORT=3306`、`DB_DATABASE=kakeibo` とする。ユーザーとパスワードは既存DBに合わせる。初期SQLでは `app_user` / `app_password` を作成する（環境側 `.env` の `DB_USERNAME` / `DB_PASSWORD` と自動連動しない）。`APP_URL` は `http://localhost:8080` に設定する。
+Laravelの `src/kakeibo/.env` に永続的な `APP_KEY` とDB接続情報を設定する。`DB_CONNECTION=mysql`、`DB_HOST=db`、`DB_PORT=3306`、`DB_DATABASE=kakeibo` とする。初期SQLでは `app_user` / `app_password` を作成する。環境側 `.env` の `DB_USERNAME` / `DB_PASSWORD` とは自動連動しないため、Laravel側の値を初期SQLに合わせる。既存DBと既存の `APP_KEY` は引き継ぐ。
 
-新規Laravel環境で `APP_KEY` が空の場合だけ `docker compose exec kakeibo-app php artisan key:generate` を実行する。既存キーは再生成しない。
+新規Laravel環境で `APP_KEY` が空の場合だけ、起動前にキーを生成し、表示された値を `src/kakeibo/.env` の `APP_KEY` に設定する。既存キーは再生成しない。
 
 ```bash
-docker compose exec kakeibo-app php artisan migrate
-docker compose exec kakeibo-app npm ci
-docker compose exec kakeibo-app npm run build
-docker compose up -d
+docker compose run --rm --no-deps kakeibo-app php artisan key:generate --show
 ```
 
-MySQL初期SQLはデータボリュームの初回作成時だけ実行される。既存データを維持するため、`docker compose down -v` や `migrate:fresh` は使用しない。
+```bash
+docker compose up -d --build --remove-orphans
+docker compose exec kakeibo-app php artisan migrate --force
+docker compose ps
+```
 
-## 日常の開発
+既存の4サービス構成から切り替える際、`--remove-orphans` は旧 `kakeibo-web` コンテナだけを削除する。MySQLの `mysql-data` ボリュームは残る。初期SQLは新しいDBボリュームの作成時だけ実行される。データ保持のため `docker compose down -v` や `migrate:fresh` は使用しない。
+
+## 日常の利用
 
 ```bash
 docker compose up -d
-docker compose logs -f household-front
+docker compose logs -f household-front kakeibo-app
 ```
 
-- 家計簿: http://localhost:5174
-- クレカ管理 / Laravel: http://localhost:8080
-- クレカ側Viteを使用する場合: `docker compose exec kakeibo-app npm run dev`（5173ポート）
-- 家計簿の型チェック・ビルド: `docker compose exec household-front npm run build`
-- Laravelテスト: `docker compose exec kakeibo-app php artisan test`
-- 停止: `docker compose stop`
+標準構成ではソースをコンテナへマウントせず、本番と同様にビルドした内容を配信する。ソースを変更したら `docker compose up -d --build` で反映する。バックエンドのヘルスチェックは http://localhost:8080/up、フロントエンドは http://localhost:5174/healthz。Laravelの本番用イメージはAPI専用で、クレカ管理画面は配信しない。
 
-家計簿サービスは起動時にlockfileどおり `npm ci` を実行する。依存パッケージはDockerの名前付きボリュームに保存する。Dockerでのローカル開発を対象とし、Sitesへの公開は行わない。
+## ホットリロード・クレカ画面が必要な場合
+
+従来の bind mount とViteを使う開発構成を `compose.dev.yml` に残している。同じ `household` プロジェクトと `mysql-data` ボリュームを使用する。構成を切り替える場合は次のコマンドで旧構成の余分なコンテナを削除する。
+
+```bash
+docker compose -f compose.dev.yml up -d --build --remove-orphans
+docker compose -f compose.dev.yml exec kakeibo-app composer install
+docker compose -f compose.dev.yml exec kakeibo-app npm ci
+docker compose -f compose.dev.yml exec kakeibo-app npm run build
+```
+
+開発構成では家計簿画面は http://localhost:5174、クレカ管理画面は http://localhost:8080。Laravel側Viteが必要なら `docker compose -f compose.dev.yml exec kakeibo-app npm run dev` を実行する。家計簿の型チェック・ビルドは `docker compose -f compose.dev.yml exec household-front npm run build`、Laravelのテストは `docker compose -f compose.dev.yml exec kakeibo-app php artisan test` で実行できる。
+
+標準構成へ戻すには `docker compose up -d --build --remove-orphans` を実行する。停止は使用中の構成に対応する `docker compose stop` または `docker compose -f compose.dev.yml stop` を使う。
