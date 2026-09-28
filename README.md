@@ -12,6 +12,12 @@
 
 本番のフロントエンドは公開HTTPSホストへAPIを転送する。ローカルではフロントエンドのイメージを変えず、nginx設定ファイルだけ `docker/nginx/household-front.local.conf.template` に差し替えてDocker内部のHTTPへ転送する。LaravelのDB接続先は `db:3306`、データベースは `kakeibo`。スキーマ変更はLaravelのマイグレーションで管理する。
 
+## スマホからの確認
+
+フロントエンドの5174番ポートはLANから接続できるよう公開している。Macとスマホを同じWi-Fiに接続し、MacのIPアドレスを調べてスマホのブラウザーから `http://<MacのIPアドレス>:5174` を開く。MacのIPアドレスは「システム設定 → Wi-Fi → 詳細 → TCP/IP」で確認できる。ターミナルでは `ipconfig getifaddr en0` でも確認できる。
+
+通常構成は `docker compose up -d --force-recreate household-front`、ホットリロード構成は `docker compose -f compose.dev.yml up -d --force-recreate household-front` でフロントを再起動する。APIはフロント経由で接続するため、スマホからLaravelへ直接接続する必要はない。接続できない場合は、Macとスマホが同じネットワークにいることと、MacのファイアウォールがDocker Desktopの接続を許可していることを確認する。
+
 ## 初回セットアップ
 
 このディレクトリで実行する。ソースは環境リポジトリの管理対象外のため、未取得の場合のみ個別にcloneする。

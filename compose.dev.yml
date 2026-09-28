@@ -10,7 +10,7 @@ services:
       TZ: Asia/Tokyo
       API_PROXY_TARGET: http://kakeibo-web
     ports:
-      - "127.0.0.1:5174:5174"
+      - "5174:5174"
     depends_on:
       - kakeibo-web
     networks:

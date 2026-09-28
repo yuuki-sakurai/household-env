@@ -10,7 +10,7 @@ services:
     volumes:
       - ./docker/nginx/household-front.local.conf.template:/etc/nginx/templates/default.conf.template:ro
     ports:
-      - "127.0.0.1:5174:8080"
+      - "5174:8080"
     depends_on:
       - kakeibo-app
     networks:
