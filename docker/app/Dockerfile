@@ -1,8 +1,5 @@
 # syntax=docker/dockerfile:1
 
-# Node.jsはPHPと同じAlpine 3.24系にそろえる
-FROM node:22.23.1-alpine3.24 AS node
-
 # Composerの実行環境ではなく、バイナリだけを取得する
 FROM composer/composer:2-bin AS composer
 
@@ -48,19 +45,6 @@ RUN docker-php-ext-install pcntl
 
 # Composerバイナリのみコピー
 COPY --from=composer /composer /usr/local/bin/composer
-
-# Node.jsとnpmをコピー
-COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-
-RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-    && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
-    \
-    # ビルド時の簡易動作確認
-    && php --version \
-    && composer --version \
-    && node --version \
-    && npm --version
 
 COPY docker/app/php.ini /usr/local/etc/php/conf.d/99-household.ini
 
