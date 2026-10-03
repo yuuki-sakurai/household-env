@@ -16,6 +16,23 @@ services:
     networks:
       - household-network
 
+  credit-card-front:
+    build:
+      context: ./src/credit-card-front
+      dockerfile: Dockerfile
+    environment:
+      TZ: Asia/Tokyo
+      PORT: 8080
+      BACKEND_HOST: kakeibo-app.local
+    volumes:
+      - ./docker/nginx/household-front.local.conf.template:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${CREDIT_CARD_FRONT_PORT:-5175}:8080"
+    depends_on:
+      - kakeibo-app
+    networks:
+      - household-network
+
   kakeibo-app:
     build:
       context: ./src/kakeibo
@@ -33,7 +50,7 @@ services:
       DB_PORT: 3306
       SESSION_SECURE_COOKIE: "false"
       SESSION_SAME_SITE: lax
-      FRONTEND_ORIGINS: http://localhost:5174
+      FRONTEND_ORIGINS: http://localhost:5174,http://localhost:${CREDIT_CARD_FRONT_PORT:-5175}
       LOG_CHANNEL: stderr
     ports:
       - "127.0.0.1:8080:8080"

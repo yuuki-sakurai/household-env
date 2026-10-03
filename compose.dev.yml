@@ -16,6 +16,23 @@ services:
     networks:
       - household-network
 
+  credit-card-front:
+    image: node:22.23.1-alpine3.24
+    working_dir: /app
+    volumes:
+      - ./src/credit-card-front:/app
+      - credit-card-node-modules:/app/node_modules
+    command: sh -c "npm ci && npm run dev"
+    environment:
+      TZ: Asia/Tokyo
+      API_PROXY_TARGET: http://kakeibo-web
+    ports:
+      - "${CREDIT_CARD_FRONT_PORT:-5175}:5175"
+    depends_on:
+      - kakeibo-web
+    networks:
+      - household-network
+
   kakeibo-app:
     build:
       context: .
@@ -24,7 +41,6 @@ services:
     volumes:
       - ./src/kakeibo:/var/www/html
       - kakeibo-vendor:/var/www/html/vendor
-      - kakeibo-node-modules:/var/www/html/node_modules
     environment:
       TZ: Asia/Tokyo
     depends_on:
@@ -32,8 +48,6 @@ services:
         condition: service_healthy
     networks:
       - household-network
-    ports:
-      - "5173:5173"
 
   kakeibo-web:
     image: nginx:stable-alpine
@@ -81,5 +95,5 @@ networks:
 volumes:
   mysql-data:
   kakeibo-vendor:
-  kakeibo-node-modules:
   household-node-modules:
+  credit-card-node-modules:
