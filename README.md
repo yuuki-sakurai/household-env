@@ -1,42 +1,56 @@
 # household-env
 
-家計簿アプリとクレカ管理ツールのローカル環境。標準の `compose.yml` は、Railwayと同じく家計簿フロントエンド・クレカフロントエンド・Laravel・MySQLの4サービスで起動する。フロントエンドとLaravelは、それぞれのリポジトリにある本番用 `Dockerfile` からビルドする。
+家計簿アプリとCardDock（クレカ管理SPA）の共通ローカル環境です。家計簿・CardDockは独立したVue SPAで、Laravel API・認証・MySQLを共用します。
 
-## 構成
+標準の `compose.yml` は、各アプリの配信用Dockerfileからビルドした4サービスを起動します。ソース変更をすぐ確認する開発時は、bind mountとViteを使う `compose.dev.yml` に切り替えます。
 
-| サービス | ソース | ローカルURL・ポート | 役割 |
+## リポジトリとサービス
+
+| サービス | ソースリポジトリ・配置 | ローカルURL・ポート | 役割 |
 | --- | --- | --- | --- |
-| `household-front` | `src/kanntan-kakeibo` | http://localhost:5174 | ビルド済みVue画面。`/api/` は内部ネットワークのLaravelへ転送 |
-| `credit-card-front` | `src/credit-card-front` | http://localhost:5175 | 独立したクレカSPA。同じLaravel API・DB・ユーザーを利用 |
-| `kakeibo-app` | `src/kakeibo` | http://localhost:8080 | Laravel API・マイグレーション |
+| `household-front` | [kanntan-kakeibo](https://github.com/yuuki-sakurai/kanntan-kakeibo) / `src/kanntan-kakeibo` | http://localhost:5174 | 家計簿SPA |
+| `credit-card-front` | [CardDock](https://github.com/yuuki-sakurai/CardDock) / `src/credit-card-front` | http://localhost:5175 | クレカ管理SPA |
+| `kakeibo-app` | [kakeibo-app](https://github.com/yuuki-sakurai/kakeibo-app) / `src/kakeibo` | http://localhost:8080 | 共通Laravel API・認証・マイグレーション |
 | `db` | MySQL 8.4 | localhost:3306 | 共通DB。`mysql-data` ボリュームで保持 |
 
-本番のフロントエンドは公開HTTPSホストへAPIを転送する。ローカルではフロントエンドのイメージを変えず、nginx設定ファイルだけ `docker/nginx/household-front.local.conf.template` に差し替えてDocker内部のHTTPへ転送する。LaravelのDB接続先は `db:3306`、データベースは `kakeibo`。スキーマ変更はLaravelのマイグレーションで管理する。
+`src` 配下の3アプリはそれぞれ独立したGitリポジトリで、環境リポジトリの管理対象外です。`main` はリリース用、`develop` は開発の統合先とし、通常の作業ブランチは `develop` から作成します。月予算APIとCardDockのSPA分離・共通API化は `develop` に統合済みです。
 
-## スマホからの確認
-
-フロントエンドの5174番・クレカ画面の5175番ポートはLANから接続できるよう公開している。Macとスマホを同じWi-Fiに接続し、MacのIPアドレスを調べてスマホのブラウザーから `http://<MacのIPアドレス>:5174` を開く。MacのIPアドレスは「システム設定 → Wi-Fi → 詳細 → TCP/IP」で確認できる。ターミナルでは `ipconfig getifaddr en0` でも確認できる。
-
-通常構成は `docker compose up -d --force-recreate household-front`、ホットリロード構成は `docker compose -f compose.dev.yml up -d --force-recreate household-front` でフロントを再起動する。APIはフロント経由で接続するため、スマホからLaravelへ直接接続する必要はない。接続できない場合は、Macとスマホが同じネットワークにいることと、MacのファイアウォールがDocker Desktopの接続を許可していることを確認する。
+標準構成の両フロントは、Nodeで作成した `dist/` をnginxで配信します。ローカル用の `docker/nginx/household-front.local.conf.template` をマウントし、`/api/` をDocker内部の `http://kakeibo-app.local:8080` へ転送します。LaravelのDB接続先は `db:3306`、データベースは `kakeibo` です。
 
 ## 初回セットアップ
 
-このディレクトリで実行する。ソースは環境リポジトリの管理対象外のため、未取得の場合のみ個別にcloneする。
+以下は `household-env` ディレクトリで実行します。Docker DesktopとGitが必要です。ソースと設定ファイルは未取得の場合のみ用意してください。開発用に各リポジトリの `develop` を取得します。
 
 ```bash
-git clone git@github.com:yuuki-sakurai/kakeibo-app.git src/kakeibo
-git clone https://github.com/yuuki-sakurai/kanntan-kakeibo.git src/kanntan-kakeibo
+git clone --branch develop https://github.com/yuuki-sakurai/kakeibo-app.git src/kakeibo
+git clone --branch develop https://github.com/yuuki-sakurai/kanntan-kakeibo.git src/kanntan-kakeibo
+git clone --branch develop https://github.com/yuuki-sakurai/CardDock.git src/credit-card-front
 cp -n .env.example .env
 cp -n src/kakeibo/.env.example src/kakeibo/.env
 ```
 
-Laravelの `src/kakeibo/.env` に永続的な `APP_KEY` とDB接続情報を設定する。`DB_CONNECTION=mysql`、`DB_HOST=db`、`DB_PORT=3306`、`DB_DATABASE=kakeibo` とする。初期SQLでは `app_user` / `app_password` を作成する。環境側 `.env` の `DB_USERNAME` / `DB_PASSWORD` とは自動連動しないため、Laravel側の値を初期SQLに合わせる。既存DBと既存の `APP_KEY` は引き継ぐ。
+Laravelの `src/kakeibo/.env` で以下を設定します。既存環境では既存の `APP_KEY` とDB接続情報を維持してください。
 
-新規Laravel環境で `APP_KEY` が空の場合だけ、起動前にキーを生成し、表示された値を `src/kakeibo/.env` の `APP_KEY` に設定する。既存キーは再生成しない。
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=kakeibo
+DB_USERNAME=app_user
+DB_PASSWORD=app_password
+FRONTEND_ORIGINS=http://localhost:5174,http://localhost:5175
+```
+
+上記DBユーザーとパスワードはローカル開発用の初期SQLに対応します。環境側 `.env` の `DB_USERNAME` / `DB_PASSWORD` を変えても、初期SQLやLaravel側の設定には自動反映されません。`CREDIT_CARD_FRONT_PORT` を変更した場合、開発構成の `FRONTEND_ORIGINS` もそのポートに合わせます。
+
+新規Laravel環境で `APP_KEY` が空の場合だけ、次のコマンドでキーを生成し、表示された値を `src/kakeibo/.env` の `APP_KEY` に設定します。既存キーは再生成しません。
 
 ```bash
+docker compose build kakeibo-app
 docker compose run --rm --no-deps kakeibo-app php artisan key:generate --show
 ```
+
+設定後にサービスを起動し、マイグレーションを適用します。
 
 ```bash
 docker compose up -d --build --remove-orphans
@@ -44,20 +58,33 @@ docker compose exec kakeibo-app php artisan migrate --force
 docker compose ps
 ```
 
-既存の4サービス構成から切り替える際、`--remove-orphans` は旧 `kakeibo-web` コンテナだけを削除する。MySQLの `mysql-data` ボリュームは残る。初期SQLは新しいDBボリュームの作成時だけ実行される。データ保持のため `docker compose down -v` や `migrate:fresh` は使用しない。
+初期SQLは新しいDBボリュームの作成時だけ実行されます。スキーマ変更はLaravelのマイグレーションで管理します。家計簿の支出とCardDockの明細は別テーブルで、既存データを移動する必要はありません。データ保持のため `docker compose down -v` や `migrate:fresh` は使用しないでください。
 
-## 日常の利用
+## 標準構成での利用
 
 ```bash
 docker compose up -d
-docker compose logs -f household-front kakeibo-app
+docker compose logs -f household-front credit-card-front kakeibo-app
 ```
 
-標準構成ではソースをコンテナへマウントせず、本番と同様にビルドした内容を配信する。ソースを変更したら `docker compose up -d --build` で反映する。バックエンドのヘルスチェックは http://localhost:8080/up、フロントエンドは http://localhost:5174/healthz。LaravelはAPI専用で、クレカ管理画面はcredit-card-frontが配信します。
+標準構成ではアプリのソースをbind mountしません。フロントを変更した場合は、対象イメージを再ビルドしてコンテナを更新します。
+
+```bash
+docker compose build household-front credit-card-front
+docker compose up -d --no-deps household-front credit-card-front
+```
+
+バックエンドを変更した場合も `docker compose up -d --build kakeibo-app` で反映し、必要なスキーマ変更がある場合は `docker compose exec kakeibo-app php artisan migrate --force` を実行します。
+
+両フロントのDockerビルドでは型チェックと本番ビルドが実行されます。起動後のフロントコンテナはnginxなので、`docker compose exec household-front npm run build` は使えません。Laravelの標準イメージも開発用依存を含まないため、テストは下記の開発構成で実行します。
+
+標準構成のヘルスチェックURLは、家計簿が http://localhost:5174/healthz 、CardDockが http://localhost:5175/healthz 、APIが http://localhost:8080/up です。
 
 ## ホットリロードで開発する場合
 
-従来の bind mount とViteを使う開発構成を `compose.dev.yml` に残している。同じ `household` プロジェクトと `mysql-data` ボリュームを使用する。構成を切り替える場合は次のコマンドで旧構成の余分なコンテナを削除する。
+`compose.dev.yml` は単独で使う開発構成です。両フロントをNode/Vite、LaravelをPHP-FPMで起動し、Laravel配信用の `kakeibo-web`（nginx）が加わる5サービス構成です。両SPAの `/api/` はViteから `http://kakeibo-web` へ転送します。Laravel側でnpmやViteを起動する必要はありません。
+
+両構成は環境側 `.env` の `COMPOSE_PROJECT_NAME=household` により同じプロジェクトと `mysql-data` ボリュームを使用します。構成を切り替えるときは次を実行します。
 
 ```bash
 docker compose -f compose.dev.yml up -d --build --remove-orphans
@@ -65,23 +92,28 @@ docker compose -f compose.dev.yml exec kakeibo-app composer install
 docker compose -f compose.dev.yml exec kakeibo-app php artisan migrate
 ```
 
-開発構成でも家計簿画面は http://localhost:5174、クレカ管理画面は http://localhost:5175、共通APIは http://localhost:8080 です。両SPAは専用NodeコンテナでViteが起動し、ソースの変更が反映されます。Laravel側でnpmやViteを起動する必要はありません。
+初回セットアップで用意したLaravelの `.env` と `APP_KEY` をそのまま使用します。フロントは起動時に `npm ci` を実行し、ソース変更を反映します。URLは標準構成と同じです。
 
-型チェックとビルドは `docker compose -f compose.dev.yml exec credit-card-front npm run build`（家計簿は `household-front`）、Laravelテストは `docker compose -f compose.dev.yml exec kakeibo-app php artisan test` を使います。
+型チェック・ビルドとLaravelテストは開発構成で実行できます。
 
-標準構成へ戻すには `docker compose up -d --build --remove-orphans` を実行する。停止は使用中の構成に対応する `docker compose stop` または `docker compose -f compose.dev.yml stop` を使う。
+```bash
+docker compose -f compose.dev.yml exec household-front npm run build
+docker compose -f compose.dev.yml exec credit-card-front npm run build
+docker compose -f compose.dev.yml exec kakeibo-app php artisan test
+```
 
-## クレカSPAの分離
+標準構成へ戻すには次を実行します。`--remove-orphans` は現在のCompose定義に存在しないコンテナ（開発構成の `kakeibo-web` など）を削除しますが、DBボリュームは保持します。
 
-`src/credit-card-front` は独立したローカルGitリポジトリです。リモートは別途作成予定のため、cloneコマンドはまだありません。リモート公開まではこのディレクトリのソース一式を用意してからComposeを起動してください。環境リポジトリにはsrc配下の各アプリのソースは含みません。
+```bash
+docker compose up -d --build --remove-orphans
+```
 
-既存の2リポジトリはdevelopから `feature/credit-card-spa` を作成し、新規SPAも同名の作業ブランチで管理しています。家計簿フロントのソースは変更していません。
+停止には使用中の構成に応じて `docker compose stop` または `docker compose -f compose.dev.yml stop` を使います。
 
-- クレカ画面: http://localhost:5175（`CREDIT_CARD_FRONT_PORT` で公開ポート変更可）
-- クレカのヘルスチェック: http://localhost:5175/healthz（標準構成）
-- 家計簿と同じメールアドレス・パスワードでログイン可能。既存データの移行は不要です。
-- クレカ用テーブルはLaravelの追加マイグレーションで作成します。家計簿のexpensesとは別テーブルで、DBは共用します。
-- 標準構成では各リポジトリのDockerfileを使います。本番への追加手順はcredit-card-frontのREADMEを参照してください。
-- スマホは同じLANの `http://<MacのIP>:5175` へ接続します。
+## スマホからの確認
 
-既存の家計簿画面との互換性を保つため、バックエンドの作業ブランチには前回の予算API（develop未マージ）も引き継いでいます。予算APIの既存PRが先にマージされた場合、重複分はGitの差分から消えます。
+両フロントのポートはLANから接続できます。Macとスマホを同じWi-Fiに接続し、スマホのブラウザーで `http://<MacのLAN IP>:5174`（家計簿）または `http://<MacのLAN IP>:5175`（CardDock）を開きます。CardDockの公開ポートは環境側 `.env` の `CREDIT_CARD_FRONT_PORT` で変更できます。
+
+MacのIPアドレスは「システム設定 → Wi-Fi → 詳細 → TCP/IP」で確認できます。Wi-Fiインターフェースが `en0` の場合、ターミナルでは `ipconfig getifaddr en0` でも確認できます。APIには各フロント経由で接続します。接続できない場合は同じネットワークにいることと、MacのファイアウォールがDocker Desktopの接続を許可していることを確認してください。
+
+両SPAは同じメールアドレス・パスワードでログインできます。別ドメイン間でログイン状態を自動共有するSSOは未実装です。
